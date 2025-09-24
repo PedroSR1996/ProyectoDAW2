@@ -1,0 +1,88 @@
+services:
+
+  eureka-server:
+    build:
+      context: ./servicio-server
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - db-network
+
+  newrestaurante_db:
+    image: mysql:8.0
+    container_name: newrestaurante_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: newrestaurante_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3307:3306"
+    volumes:
+      - newrestaurante_db_data:/var/lib/mysql
+    networks:
+      - db-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - db-network
+
+  servicio-reserva:
+    image: servicio-reserva:1.0
+    container_name: servicio-reserva
+    build:
+      context: ./proyecto-reserva
+      dockerfile: Dockerfile
+    depends_on:
+      - newrestaurante_db
+      - eureka-server
+      - rabbitmq
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://newrestaurante_db:3306/newrestaurante_db
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8080:8080"
+    networks:
+      - db-network
+
+  servicio-transporte:
+    image: servicio-transporte:1.0
+    container_name: servicio-transporte
+    build:
+      context: ./proyecto-transporte
+      dockerfile: Dockerfile
+    depends_on:
+      - newrestaurante_db
+      - eureka-server
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://newrestaurante_db:3306/newrestaurante_db
+      SPRING_DATASOURCE_USERNAME: user
+      SPRING_DATASOURCE_PASSWORD: password
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8081:8081"
+    networks:
+      - db-network
+
+volumes:
+  newrestaurante_db_data:
+
+networks:
+  db-network:
